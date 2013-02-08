@@ -18,6 +18,8 @@
 #include <linux/usb.h>
 #include <linux/usb/gadget.h>
 
+#define printk(fmt, ...) (0)
+
 /******************************************************************************
  * DEFINE
  *****************************************************************************/
@@ -138,9 +140,9 @@ struct ci13xxx {
 	struct ci_role_driver		*roles[CI_ROLE_END];
 	enum ci_role			role;
 	bool				is_otg;
-	struct work_struct		work;
-	struct work_struct		vbus_work;
-	struct workqueue_struct		*wq;
+//	struct work_struct		work;
+//	struct work_struct		vbus_work;
+//	struct workqueue_struct		*wq;
 
 	struct dma_pool			*qh_pool;
 	struct dma_pool			*td_pool;
@@ -212,16 +214,16 @@ enum ci13xxx_regs {
 	CAP_CAPLENGTH,
 	CAP_HCCPARAMS,
 	CAP_DCCPARAMS,
-	CAP_TESTMODE,
-	CAP_LAST = CAP_TESTMODE,
+//	CAP_TESTMODE,
+	CAP_LAST = CAP_DCCPARAMS, //CAP_TESTMODE,
 	OP_USBCMD,
 	OP_USBSTS,
 	OP_USBINTR,
 	OP_DEVICEADDR,
 	OP_ENDPTLISTADDR,
 	OP_PORTSC,
-	OP_DEVLC,
-	OP_OTGSC,
+//	OP_DEVLC,
+//	OP_OTGSC,
 	OP_USBMODE,
 	OP_ENDPTSETUPSTAT,
 	OP_ENDPTPRIME,
@@ -255,7 +257,10 @@ static inline int ffs_nr(u32 x)
  */
 static inline u32 hw_read(struct ci13xxx *ci, enum ci13xxx_regs reg, u32 mask)
 {
-	return ioread32(ci->hw_bank.regmap[reg]) & mask;
+	u32 data;
+	data = ioread32(ci->hw_bank.regmap[reg]) & mask;
+	printk("hw_read 0x%p / 0x%08x -> 0x%08x\n", ci->hw_bank.regmap[reg], mask, data);
+	return data;
 }
 
 /**
@@ -267,6 +272,8 @@ static inline u32 hw_read(struct ci13xxx *ci, enum ci13xxx_regs reg, u32 mask)
 static inline void hw_write(struct ci13xxx *ci, enum ci13xxx_regs reg,
 			    u32 mask, u32 data)
 {
+	printk("hw_write 0x%p / 0x%08x <- 0x%08x\n", ci->hw_bank.regmap[reg], mask, data);
+
 	if (~mask)
 		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
 			| (data & mask);
@@ -287,6 +294,9 @@ static inline u32 hw_test_and_clear(struct ci13xxx *ci, enum ci13xxx_regs reg,
 	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
 
 	iowrite32(val, ci->hw_bank.regmap[reg]);
+
+	printk("hw_test_and_clear 0x%p / 0x%08x <- 0x%08x\n", ci->hw_bank.regmap[reg], mask, val);
+
 	return val;
 }
 

@@ -30,6 +30,7 @@
 #define gadget_is_atmel_usba(g)		(!strcmp("atmel_usba_udc", (g)->name))
 #define gadget_is_bcm63xx(g)		(!strcmp("bcm63xx_udc", (g)->name))
 #define gadget_is_ci13xxx_msm(g)	(!strcmp("ci13xxx_msm", (g)->name))
+#define gadget_is_ci13xxx_ar9331(g)	(!strcmp("ci13xxx_ar9331", (g)->name))
 #define gadget_is_ci13xxx_pci(g)	(!strcmp("ci13xxx_pci", (g)->name))
 #define gadget_is_dummy(g)		(!strcmp("dummy_udc", (g)->name))
 #define gadget_is_dwc3(g)		(!strcmp("dwc3-gadget", (g)->name))
@@ -124,6 +125,8 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x33;
 	else if (gadget_is_bcm63xx(gadget))
 		return 0x34;
+	else if (gadget_is_ci13xxx_ar9331(gadget))
+		return 0x35;
 
 	return -ENOENT;
 }

@@ -308,6 +308,7 @@ MODULE_LICENSE("GPL");
 
 static int __init init(void)
 {
+	printk("zero: init\n");
 	return usb_composite_probe(&zero_driver);
 }
 module_init(init);
