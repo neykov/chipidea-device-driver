@@ -7,8 +7,6 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
 ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
 ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
 
-obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_ar9331.o
-
 # Glue/Bridge layers go here
 
 obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o

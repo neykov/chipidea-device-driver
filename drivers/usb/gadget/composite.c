@@ -1567,8 +1567,6 @@ int usb_composite_probe(struct usb_composite_driver *driver)
 {
 	struct usb_gadget_driver *gadget_driver;
 
-	printk("%s\n", __func__);
-
 	if (!driver || !driver->dev || !driver->bind)
 		return -EINVAL;
 
