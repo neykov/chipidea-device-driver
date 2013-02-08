@@ -145,8 +145,6 @@ static void host_stop(struct ci13xxx *ci)
 
 int ci_hdrc_host_init(struct ci13xxx *ci)
 {
-	return -ENXIO;
-
 	struct ci_role_driver *rdrv;
 
 	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_HC))

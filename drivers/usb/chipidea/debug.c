@@ -110,7 +110,6 @@ static int hw_register_write(struct ci13xxx *ci, u16 addr, u32 data)
  *
  * This function returns an error code
  */
-/*
 static int hw_intr_clear(struct ci13xxx *ci, int n)
 {
 	if (n >= REG_BITS)
@@ -120,7 +119,6 @@ static int hw_intr_clear(struct ci13xxx *ci, int n)
 	hw_write(ci, OP_USBSTS,  BIT(n), BIT(n));
 	return 0;
 }
-*/
 
 /**
  * hw_intr_force: enables interrupt & forces interrupt status (execute without
@@ -129,7 +127,6 @@ static int hw_intr_clear(struct ci13xxx *ci, int n)
  *
  * This function returns an error code
  */
-/*
 static int hw_intr_force(struct ci13xxx *ci, int n)
 {
 	if (n >= REG_BITS)
@@ -141,7 +138,6 @@ static int hw_intr_force(struct ci13xxx *ci, int n)
 	hw_write(ci, CAP_TESTMODE, TESTMODE_FORCE, 0);
 	return 0;
 }
-*/
 
 /**
  * show_device: prints information about device capabilities and status
@@ -228,7 +224,7 @@ static struct {
 	rwlock_t lck;   /* lock */
 } dbg_data = {
 	.idx = 0,
-	.tty = 1,
+	.tty = 0,
 	.lck = __RW_LOCK_UNLOCKED(lck)
 };
 
@@ -413,37 +409,35 @@ static DEVICE_ATTR(events, S_IRUSR | S_IWUSR, show_events, store_events);
  *
  * Check "device.h" for details
  */
+static ssize_t show_inters(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct ci13xxx *ci = container_of(dev, struct ci13xxx, gadget.dev);
+	unsigned long flags;
+	u32 intr;
+	unsigned i, j, n = 0;
 
-//static ssize_t show_inters(struct device *dev, struct device_attribute *attr,
-//			   char *buf)
-//{
-//	struct ci13xxx *ci = container_of(dev, struct ci13xxx, gadget.dev);
-//	unsigned long flags;
-//	u32 intr;
-//	unsigned i, j, n = 0;
-//
-//	if (attr == NULL || buf == NULL) {
-//		dev_err(ci->dev, "[%s] EINVAL\n", __func__);
-//		return 0;
-//	}
-//
-//	spin_lock_irqsave(&ci->lock, flags);
-//
-//	/*n += scnprintf(buf + n, PAGE_SIZE - n,
-//		       "status = %08x\n", hw_read_intr_status(ci));
-//	n += scnprintf(buf + n, PAGE_SIZE - n,
-//	"enable = %08x\n", hw_read_intr_enable(ci));*/
-//
-//	n += scnprintf(buf + n, PAGE_SIZE - n, "*test = %d\n",
-//		       isr_statistics.test);
-//	n += scnprintf(buf + n, PAGE_SIZE - n, "? ui  = %d\n",
-//		       isr_statistics.ui);
-//	n += scnprintf(buf + n, PAGE_SIZE - n, "? uei = %d\n",
-//		       isr_statistics.uei);
-//	n += scnprintf(buf + n, PAGE_SIZE - n, "? pci = %d\n",
-//		       isr_statistics.pci);
-//	n += scnprintf(buf + n, PAGE_SIZE - n, "? uri = %d\n",
-/*
+	if (attr == NULL || buf == NULL) {
+		dev_err(ci->dev, "[%s] EINVAL\n", __func__);
+		return 0;
+	}
+
+	spin_lock_irqsave(&ci->lock, flags);
+
+	/*n += scnprintf(buf + n, PAGE_SIZE - n,
+		       "status = %08x\n", hw_read_intr_status(ci));
+	n += scnprintf(buf + n, PAGE_SIZE - n,
+	"enable = %08x\n", hw_read_intr_enable(ci));*/
+
+	n += scnprintf(buf + n, PAGE_SIZE - n, "*test = %d\n",
+		       isr_statistics.test);
+	n += scnprintf(buf + n, PAGE_SIZE - n, "? ui  = %d\n",
+		       isr_statistics.ui);
+	n += scnprintf(buf + n, PAGE_SIZE - n, "? uei = %d\n",
+		       isr_statistics.uei);
+	n += scnprintf(buf + n, PAGE_SIZE - n, "? pci = %d\n",
+		       isr_statistics.pci);
+	n += scnprintf(buf + n, PAGE_SIZE - n, "? uri = %d\n",
 		       isr_statistics.uri);
 	n += scnprintf(buf + n, PAGE_SIZE - n, "? sli = %d\n",
 		       isr_statistics.sli);
@@ -481,7 +475,6 @@ static DEVICE_ATTR(events, S_IRUSR | S_IWUSR, show_events, store_events);
 
 	return n;
 }
-*/
 
 /**
  * store_inters: enable & force or disable an individual interrutps
@@ -489,7 +482,6 @@ static DEVICE_ATTR(events, S_IRUSR | S_IWUSR, show_events, store_events);
  *
  * Check "device.h" for details
  */
-/*
 static ssize_t store_inters(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
@@ -523,7 +515,7 @@ static ssize_t store_inters(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 static DEVICE_ATTR(inters, S_IRUSR | S_IWUSR, show_inters, store_inters);
-*/
+
 /**
  * show_port_test: reads port test mode
  *
@@ -755,9 +747,9 @@ int dbg_create_files(struct device *dev)
 	retval = device_create_file(dev, &dev_attr_events);
 	if (retval)
 		goto rm_driver;
-//	retval = device_create_file(dev, &dev_attr_inters);
-//	if (retval)
-//		goto rm_events;
+	retval = device_create_file(dev, &dev_attr_inters);
+	if (retval)
+		goto rm_events;
 	retval = device_create_file(dev, &dev_attr_port_test);
 	if (retval)
 		goto rm_inters;
@@ -779,8 +771,8 @@ int dbg_create_files(struct device *dev)
  rm_port_test:
 	device_remove_file(dev, &dev_attr_port_test);
  rm_inters:
-//	device_remove_file(dev, &dev_attr_inters);
-// rm_events:
+	device_remove_file(dev, &dev_attr_inters);
+ rm_events:
 	device_remove_file(dev, &dev_attr_events);
  rm_driver:
 	device_remove_file(dev, &dev_attr_driver);
@@ -804,7 +796,7 @@ int dbg_remove_files(struct device *dev)
 	device_remove_file(dev, &dev_attr_registers);
 	device_remove_file(dev, &dev_attr_qheads);
 	device_remove_file(dev, &dev_attr_port_test);
-//	device_remove_file(dev, &dev_attr_inters);
+	device_remove_file(dev, &dev_attr_inters);
 	device_remove_file(dev, &dev_attr_events);
 	device_remove_file(dev, &dev_attr_driver);
 	device_remove_file(dev, &dev_attr_device);

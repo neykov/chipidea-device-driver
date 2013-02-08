@@ -49,9 +49,6 @@
  * - Gadget API (majority of optional features)
  * - Suspend & Remote Wakeup
  */
-#define DEBUG
-#define TRACE
-
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/dmapool.h>
@@ -82,15 +79,15 @@ static uintptr_t ci_regs_nolpm[] = {
 	[CAP_CAPLENGTH]		= 0x000UL,
 	[CAP_HCCPARAMS]		= 0x008UL,
 	[CAP_DCCPARAMS]		= 0x024UL,
-//	[CAP_TESTMODE]		= 0x038UL,
+	[CAP_TESTMODE]		= 0x038UL,
 	[OP_USBCMD]		= 0x000UL,
 	[OP_USBSTS]		= 0x004UL,
 	[OP_USBINTR]		= 0x008UL,
 	[OP_DEVICEADDR]		= 0x014UL,
 	[OP_ENDPTLISTADDR]	= 0x018UL,
 	[OP_PORTSC]		= 0x044UL,
-//	[OP_DEVLC]		= 0x084UL,
-//	[OP_OTGSC]		= 0x064UL,
+	[OP_DEVLC]		= 0x084UL,
+	[OP_OTGSC]		= 0x064UL,
 	[OP_USBMODE]		= 0x068UL,
 	[OP_ENDPTSETUPSTAT]	= 0x06CUL,
 	[OP_ENDPTPRIME]		= 0x070UL,
@@ -104,15 +101,15 @@ static uintptr_t ci_regs_lpm[] = {
 	[CAP_CAPLENGTH]		= 0x000UL,
 	[CAP_HCCPARAMS]		= 0x008UL,
 	[CAP_DCCPARAMS]		= 0x024UL,
-//	[CAP_TESTMODE]		= 0x0FCUL,
+	[CAP_TESTMODE]		= 0x0FCUL,
 	[OP_USBCMD]		= 0x000UL,
 	[OP_USBSTS]		= 0x004UL,
 	[OP_USBINTR]		= 0x008UL,
 	[OP_DEVICEADDR]		= 0x014UL,
 	[OP_ENDPTLISTADDR]	= 0x018UL,
 	[OP_PORTSC]		= 0x044UL,
-//	[OP_DEVLC]		= 0x084UL,
-//	[OP_OTGSC]		= 0x0C4UL,
+	[OP_DEVLC]		= 0x084UL,
+	[OP_OTGSC]		= 0x0C4UL,
 	[OP_USBMODE]		= 0x0C8UL,
 	[OP_ENDPTSETUPSTAT]	= 0x0D8UL,
 	[OP_ENDPTPRIME]		= 0x0DCUL,
@@ -125,8 +122,6 @@ static uintptr_t ci_regs_lpm[] = {
 static int hw_alloc_regmap(struct ci13xxx *ci, bool is_lpm)
 {
 	int i;
-
-	printk(KERN_DEBUG "%s\n", __func__);
 
 	kfree(ci->hw_bank.regmap);
 
@@ -158,8 +153,6 @@ static int hw_alloc_regmap(struct ci13xxx *ci, bool is_lpm)
  */
 int hw_port_test_set(struct ci13xxx *ci, u8 mode)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	const u8 TEST_MODE_MAX = 7;
 
 	if (mode > TEST_MODE_MAX)
@@ -176,7 +169,6 @@ int hw_port_test_set(struct ci13xxx *ci, u8 mode)
  */
 u8 hw_port_test_get(struct ci13xxx *ci)
 {
-	printk(KERN_DEBUG " hw_port_test_get\n");
 	return hw_read(ci, OP_PORTSC, PORTSC_PTC) >> ffs_nr(PORTSC_PTC);
 }
 
@@ -184,14 +176,12 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
 {
 	u32 reg;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	/* bank is a module variable */
 	ci->hw_bank.abs = base;
 
 	ci->hw_bank.cap = ci->hw_bank.abs;
 	ci->hw_bank.cap += ci->platdata->capoffset;
-	ci->hw_bank.op = ci->hw_bank.cap + (ioread32(ci->hw_bank.cap) & 0xFF);
+	ci->hw_bank.op = ci->hw_bank.cap + ioread8(ci->hw_bank.cap);
 
 	hw_alloc_regmap(ci, false);
 	reg = hw_read(ci, CAP_HCCPARAMS, HCCPARAMS_LEN) >>
@@ -229,8 +219,6 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
  */
 int hw_device_reset(struct ci13xxx *ci, u32 mode)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	/* should flush & stop before reset */
 	hw_write(ci, OP_ENDPTFLUSH, ~0, ~0);
 	hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
@@ -250,7 +238,6 @@ int hw_device_reset(struct ci13xxx *ci, u32 mode)
 	/* USBMODE should be configured step by step */
 	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
 	hw_write(ci, OP_USBMODE, USBMODE_CM, mode);
-//	hw_write(ci, OP_USBMODE, USBMODE_ES, USBMODE_ES_BE);
 	/* HW >= 2.3 */
 	hw_write(ci, OP_USBMODE, USBMODE_SLOM, USBMODE_SLOM);
 
@@ -267,11 +254,8 @@ int hw_device_reset(struct ci13xxx *ci, u32 mode)
  * ci_otg_role - pick role based on ID pin state
  * @ci: the controller
  */
-/*
 static enum ci_role ci_otg_role(struct ci13xxx *ci)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	u32 sts = hw_read(ci, OP_OTGSC, ~0);
 	enum ci_role role = sts & OTGSC_ID
 		? CI_ROLE_GADGET
@@ -279,17 +263,13 @@ static enum ci_role ci_otg_role(struct ci13xxx *ci)
 
 	return role;
 }
-*/
 
 /**
  * ci_role_work - perform role changing based on ID pin
  * @work: work struct
  */
-/*
 static void ci_role_work(struct work_struct *work)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	struct ci13xxx *ci = container_of(work, struct ci13xxx, work);
 	enum ci_role role = ci_otg_role(ci);
 
@@ -302,13 +282,10 @@ static void ci_role_work(struct work_struct *work)
 		enable_irq(ci->irq);
 	}
 }
-*/
 
 static ssize_t show_role(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	struct ci13xxx *ci = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%s\n", ci_role(ci)->name);
@@ -317,8 +294,6 @@ static ssize_t show_role(struct device *dev, struct device_attribute *attr,
 static ssize_t store_role(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t count)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	struct ci13xxx *ci = dev_get_drvdata(dev);
 	enum ci_role role;
 	int ret;
@@ -344,18 +319,13 @@ static irqreturn_t ci_irq(int irq, void *data)
 {
 	struct ci13xxx *ci = data;
 	irqreturn_t ret = IRQ_NONE;
-//	u32 otgsc = 0;
+	u32 otgsc = 0;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
-/*
 	if (ci->is_otg)
 		otgsc = hw_read(ci, OP_OTGSC, ~0);
-*/
 
 	if (ci->role != CI_ROLE_END)
 		ret = ci_role(ci)->irq(ci);
-/*
 
 	if (ci->is_otg && (otgsc & OTGSC_IDIS)) {
 		hw_write(ci, OP_OTGSC, OTGSC_IDIS, OTGSC_IDIS);
@@ -363,7 +333,6 @@ static irqreturn_t ci_irq(int irq, void *data)
 		queue_work(ci->wq, &ci->work);
 		ret = IRQ_HANDLED;
 	}
-*/
 
 	return ret;
 }
@@ -376,8 +345,6 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
 {
 	struct platform_device *pdev;
 	int id, ret;
-
-	printk(KERN_DEBUG "%s\n", __func__);
 
 	id = ida_simple_get(&ci_ida, 0, 0, GFP_KERNEL);
 	if (id < 0)
@@ -418,8 +385,6 @@ EXPORT_SYMBOL_GPL(ci13xxx_add_device);
 
 void ci13xxx_remove_device(struct platform_device *pdev)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	int id = pdev->id;
 	platform_device_unregister(pdev);
 	ida_simple_remove(&ci_ida, id);
@@ -434,8 +399,6 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	void __iomem	*base;
 	int		ret;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	if (!dev->platform_data) {
 		dev_err(dev, "platform data missing\n");
 		return -ENODEV;
@@ -448,7 +411,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	}
 
 	base = devm_request_and_ioremap(dev, res);
-	if (!base) {
+	if (!res) {
 		dev_err(dev, "can't request and ioremap resource\n");
 		return -ENOMEM;
 	}
@@ -471,8 +434,6 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 		dev_err(dev, "can't initialize hardware\n");
 		return -ENODEV;
 	}
-	
-	printk(KERN_DEBUG "OK hw_device_init\n");
 
 	ci->hw_bank.phys = res->start;
 
@@ -482,9 +443,6 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	printk(KERN_DEBUG "OK platform_get_irq\n");
-
-/*
 	INIT_WORK(&ci->work, ci_role_work);
 	ci->wq = create_singlethread_workqueue("ci_otg");
 	if (!ci->wq) {
@@ -492,21 +450,14 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	printk(KERN_DEBUG "OK create_singlethread_workqueue('ci_otg');\n");
-*/
-
 	/* initialize role(s) before the interrupt is requested */
 	ret = ci_hdrc_host_init(ci);
 	if (ret)
 		dev_info(dev, "doesn't support host\n");
 
-	printk(KERN_DEBUG "OK ci_hdrc_host_init, ret=%x\n", ret);
-
 	ret = ci_hdrc_gadget_init(ci);
 	if (ret)
 		dev_info(dev, "doesn't support gadget\n");
-
-	printk(KERN_DEBUG "OK ci_hdrc_gadet_init, ret=%x\n", ret);
 
 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
 		dev_err(dev, "no supported roles\n");
@@ -514,19 +465,16 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 		goto rm_wq;
 	}
 
-
-//	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
-//		ci->is_otg = true;
-//		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
-//		mdelay(2);
-//		ci->role = ci_otg_role(ci);
-//	} else {
-//		ci->role = ci->roles[CI_ROLE_HOST]
-//			? CI_ROLE_HOST
-//			: CI_ROLE_GADGET;
-//	}
-
-	ci->role = CI_ROLE_GADGET;
+	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+		ci->is_otg = true;
+		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
+		mdelay(2);
+		ci->role = ci_otg_role(ci);
+	} else {
+		ci->role = ci->roles[CI_ROLE_HOST]
+			? CI_ROLE_HOST
+			: CI_ROLE_GADGET;
+	}
 
 	ret = ci_role_start(ci, ci->role);
 	if (ret) {
@@ -545,8 +493,8 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		goto rm_attr;
 
-//	if (ci->is_otg)
-//		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
+	if (ci->is_otg)
+		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
 
 	return ret;
 
@@ -555,8 +503,8 @@ rm_attr:
 stop:
 	ci_role_stop(ci);
 rm_wq:
-//	flush_workqueue(ci->wq);
-//	destroy_workqueue(ci->wq);
+	flush_workqueue(ci->wq);
+	destroy_workqueue(ci->wq);
 
 	return ret;
 }
@@ -565,10 +513,8 @@ static int __devexit ci_hdrc_remove(struct platform_device *pdev)
 {
 	struct ci13xxx *ci = platform_get_drvdata(pdev);
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
-//	flush_workqueue(ci->wq);
-//	destroy_workqueue(ci->wq);
+	flush_workqueue(ci->wq);
+	destroy_workqueue(ci->wq);
 	device_remove_file(ci->dev, &dev_attr_role);
 	free_irq(ci->irq, ci);
 	ci_role_stop(ci);
