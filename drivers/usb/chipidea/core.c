@@ -181,7 +181,7 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
 
 	ci->hw_bank.cap = ci->hw_bank.abs;
 	ci->hw_bank.cap += ci->platdata->capoffset;
-	ci->hw_bank.op = ci->hw_bank.cap + ioread8(ci->hw_bank.cap);
+	ci->hw_bank.op = ci->hw_bank.cap + (ioread32(ci->hw_bank.cap) & 0xFF);
 
 	hw_alloc_regmap(ci, false);
 	reg = hw_read(ci, CAP_HCCPARAMS, HCCPARAMS_LEN) >>
@@ -398,6 +398,8 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	struct resource	*res;
 	void __iomem	*base;
 	int		ret;
+	bool force_host_mode = (dev->platform_data.flags & CI13XXX_FORCE_HOST_MODE) > 0;
+	bool force_device_mode = (dev->platform_data.flags & CI13XXX_FORCE_DEVICE_MODE) > 0;
 
 	if (!dev->platform_data) {
 		dev_err(dev, "platform data missing\n");
@@ -411,7 +413,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	}
 
 	base = devm_request_and_ioremap(dev, res);
-	if (!res) {
+	if (!base) {
 		dev_err(dev, "can't request and ioremap resource\n");
 		return -ENOMEM;
 	}
@@ -459,21 +461,29 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		dev_info(dev, "doesn't support gadget\n");
 
-	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET] ||
+			force_host_mode && !ci->roles[CI_ROLE_HOST] ||
+			foce_device_mode && !ci->roles[CI_ROLE_GADGET]) {
 		dev_err(dev, "no supported roles\n");
 		ret = -ENODEV;
 		goto rm_wq;
 	}
 
-	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+	if (!force_host_mode && !force_device_mode &&
+			ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
 		ci->is_otg = true;
 		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
 		mdelay(2);
 		ci->role = ci_otg_role(ci);
 	} else {
-		ci->role = ci->roles[CI_ROLE_HOST]
-			? CI_ROLE_HOST
-			: CI_ROLE_GADGET;
+		if (force_host_mode)
+			ci->role = CI_ROLE_HOST;
+		else if (force_device_mode)
+			ci->role = CI_ROLE_GADGET;
+		else
+			ci->role = ci->roles[CI_ROLE_HOST]
+				? CI_ROLE_HOST
+				: CI_ROLE_GADGET;
 	}
 
 	ret = ci_role_start(ci, ci->role);
