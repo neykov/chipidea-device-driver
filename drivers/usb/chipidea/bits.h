@@ -36,6 +36,7 @@
 #define USBi_UI               BIT(0)
 #define USBi_UEI              BIT(1)
 #define USBi_PCI              BIT(2)
+#define USBi_SEI              BIT(4)
 #define USBi_URI              BIT(6)
 #define USBi_SLI              BIT(8)
 
@@ -74,6 +75,8 @@
 /* USBMODE */
 #define USBMODE_CM            (0x03UL <<  0)
 #define USBMODE_CM_DC         (0x02UL <<  0)
+#define USBMODE_ES	      BIT(2)
+#define USBMODE_ES_BE         (0x01UL <<  2)
 #define USBMODE_SLOM          BIT(3)
 #define USBMODE_CI_SDIS       BIT(4)
 

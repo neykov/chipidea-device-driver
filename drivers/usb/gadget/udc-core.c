@@ -17,6 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define DEBUG
+#define TRACE
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -316,6 +319,8 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 	struct usb_udc		*udc = NULL;
 	int			ret;
 
+	printk("%s\n", __func__);
+
 	if (!driver || !driver->bind || !driver->setup)
 		return -EINVAL;
 
@@ -333,14 +338,17 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 found:
 	dev_dbg(&udc->dev, "registering UDC driver [%s]\n",
 			driver->function);
-
+	printk("registering UDC driver [%s]\n",
+			driver->function);
 	udc->driver = driver;
 	udc->dev.driver = &driver->driver;
 
 	if (udc_is_newstyle(udc)) {
+		printk("new style udc driver\n");
 		ret = driver->bind(udc->gadget, driver);
 		if (ret)
 			goto err1;
+		printk("start gadget\n");
 		ret = usb_gadget_udc_start(udc->gadget, driver);
 		if (ret) {
 			driver->unbind(udc->gadget);
