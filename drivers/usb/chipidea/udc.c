@@ -434,7 +434,7 @@ static int _hardware_enqueue(struct ci13xxx_ep *mEp, struct ci13xxx_req *mReq)
 
 		memset(mReq->zptr, 0, sizeof(*mReq->zptr));
 		mReq->zptr->next = cpu_to_le32(TD_TERMINATE);
-		u32 token = TD_STATUS_ACTIVE;
+		token = TD_STATUS_ACTIVE;
 		if (!mReq->req.no_interrupt)
 			token |= TD_IOC;
 		mReq->zptr->token = cpu_to_le32(token);
