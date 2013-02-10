@@ -398,8 +398,8 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	struct resource	*res;
 	void __iomem	*base;
 	int		ret;
-	bool force_host_mode = (dev->platform_data.flags & CI13XXX_FORCE_HOST_MODE) > 0;
-	bool force_device_mode = (dev->platform_data.flags & CI13XXX_FORCE_DEVICE_MODE) > 0;
+	bool force_host_mode;
+	bool force_device_mode;
 
 	if (!dev->platform_data) {
 		dev_err(dev, "platform data missing\n");
@@ -461,9 +461,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		dev_info(dev, "doesn't support gadget\n");
 
-	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET] ||
-			force_host_mode && !ci->roles[CI_ROLE_HOST] ||
-			foce_device_mode && !ci->roles[CI_ROLE_GADGET]) {
+	force_host_mode = (ci->platdata->flags & CI13XXX_FORCE_HOST_MODE) > 0;
+	force_device_mode = (ci->platdata->flags & CI13XXX_FORCE_DEVICE_MODE) > 0;
+	if ((!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) ||
+			(force_host_mode && !ci->roles[CI_ROLE_HOST]) ||
+			(force_device_mode && !ci->roles[CI_ROLE_GADGET])) {
 		dev_err(dev, "no supported roles\n");
 		ret = -ENODEV;
 		goto rm_wq;

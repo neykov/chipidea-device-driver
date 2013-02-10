@@ -14,6 +14,8 @@
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
 
+#include "ci.h"
+
 static struct ci13xxx_platform_data ci13xxx_ar933x_platdata = {
 	.name			= "ci13xxx_ar933x",
 	.flags			= 0,
@@ -27,11 +29,11 @@ static int __devinit ci13xxx_ar933x_probe(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "ci13xxx_ar933x_probe\n");
 
-	bootstrap = ath79_reset_rr(AR934X_RESET_REG_BOOTSTRAP);
-	if (bootstrap & AR934X_BOOTSTRAP_USB_MODE_DEVICE)
-		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_DEVICE_MODE
+	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
+	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST)
+		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_HOST_MODE;
 	else
-		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_HOST_MODE
+		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_DEVICE_MODE;
 
 	plat_ci = ci13xxx_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
