@@ -461,8 +461,8 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		dev_info(dev, "doesn't support gadget\n");
 
-	force_host_mode = (ci->platdata->flags & CI13XXX_FORCE_HOST_MODE) > 0;
-	force_device_mode = (ci->platdata->flags & CI13XXX_FORCE_DEVICE_MODE) > 0;
+	force_host_mode = ci->platdata->flags & CI13XXX_FORCE_HOST_MODE;
+	force_device_mode = ci->platdata->flags & CI13XXX_FORCE_DEVICE_MODE;
 	if ((!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) ||
 			(force_host_mode && !ci->roles[CI_ROLE_HOST]) ||
 			(force_device_mode && !ci->roles[CI_ROLE_GADGET])) {
