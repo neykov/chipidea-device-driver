@@ -460,21 +460,25 @@ static int _hardware_enqueue(struct ci13xxx_ep *mEp, struct ci13xxx_req *mReq)
 	}
 	mReq->ptr->token = cpu_to_le32(token);
 	mReq->ptr->page[0]  = cpu_to_le32(mReq->req.dma);
-	for (i = 1; i < 5; i++)
-		mReq->ptr->page[i] =
-			cpu_to_le32((mReq->req.dma + i * CI13XXX_PAGE_SIZE) & ~TD_RESERVED_MASK);
+	for (i = 1; i < 5; i++) {
+		u32 page = mReq->req.dma + i * CI13XXX_PAGE_SIZE;
+		page &= ~TD_RESERVED_MASK;
+		mReq->ptr->page[i] = cpu_to_le32(page);
+	}
 
 	if (!list_empty(&mEp->qh.queue)) {
 		struct ci13xxx_req *mReqPrev;
 		int n = hw_ep_bit(mEp->num, mEp->dir);
 		int tmp_stat;
+		u32 next;
 
 		mReqPrev = list_entry(mEp->qh.queue.prev,
 				struct ci13xxx_req, queue);
+		next = mReq->dma & TD_ADDR_MASK;
 		if (mReqPrev->zptr)
-			mReqPrev->zptr->next = cpu_to_le32(mReq->dma & TD_ADDR_MASK);
+			mReqPrev->zptr->next = cpu_to_le32(next);
 		else
-			mReqPrev->ptr->next = cpu_to_le32(mReq->dma & TD_ADDR_MASK);
+			mReqPrev->ptr->next = cpu_to_le32(next);
 		wmb();
 		if (hw_read(ci, OP_ENDPTPRIME, BIT(n)))
 			goto done;
@@ -490,9 +494,11 @@ static int _hardware_enqueue(struct ci13xxx_ep *mEp, struct ci13xxx_req *mReq)
 	/*  QH configuration */
 	mEp->qh.ptr->td.next   = cpu_to_le32(mReq->dma);    /* TERMINATE = 0 */
 	token = le32_to_cpu(mEp->qh.ptr->td.token);
-	mEp->qh.ptr->td.token = cpu_to_le32(token & ~TD_STATUS);   /* clear status */
+	token &= ~TD_STATUS;
+	mEp->qh.ptr->td.token = cpu_to_le32(token);   /* clear status */
 	cap = le32_to_cpu(mEp->qh.ptr->cap);
-	mEp->qh.ptr->cap = cpu_to_le32(cap | QH_ZLT);
+	cap |= QH_ZLT;
+	mEp->qh.ptr->cap = cpu_to_le32(cap);
 
 	wmb();   /* synchronize before ep prime */
 
@@ -1051,16 +1057,17 @@ static int ep_enable(struct usb_ep *ep,
 	if (mEp->type == USB_ENDPOINT_XFER_CONTROL)
 		cap |=  QH_IOS;
 	else if (mEp->type == USB_ENDPOINT_XFER_ISOC)
-		cap &= ~QH_MULT; //cap is already 0, why clear bits?
+		cap &= ~QH_MULT;
 	else
-		cap &= ~QH_ZLT; //cap is already 0, why clear bits?
+		cap &= ~QH_ZLT;
 
 	cap |=
 		(mEp->ep.maxpacket << ffs_nr(QH_MAX_PKT)) & QH_MAX_PKT;
 	mEp->qh.ptr->cap = cpu_to_le32(cap);
 
 	next = le32_to_cpu(mEp->qh.ptr->td.next);
-	mEp->qh.ptr->td.next = cpu_to_le32(next | TD_TERMINATE);   /* needed? */
+	next |= TD_TERMINATE;
+	mEp->qh.ptr->td.next = cpu_to_le32(next);   /* needed? */
 
 	/*
 	 * Enable endpoints in the HW other than ep0 as ep0
@@ -1400,7 +1407,7 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
 			pm_runtime_get_sync(&_gadget->dev);
 			hw_device_reset(ci, USBMODE_CM_DC);
 
-			if(ci->is_otg)
+			if (ci->is_otg)
 				hw_enable_vbus_intr(ci);
 
 			hw_device_state(ci, ci->ep0out->qh.dma);
@@ -1579,7 +1586,7 @@ static int ci13xxx_start(struct usb_gadget *gadget,
 		if (ci->vbus_active) {
 			if (ci->platdata->flags & CI13XXX_REGS_SHARED) {
 				hw_device_reset(ci, USBMODE_CM_DC);
-				if(ci->is_otg)
+				if (ci->is_otg)
 					hw_enable_vbus_intr(ci);
 			}
 		} else {
@@ -1688,7 +1695,7 @@ static irqreturn_t udc_irq(struct ci13xxx *ci)
 		retval = IRQ_NONE;
 	}
 
-	if(ci->is_otg) {
+	if (ci->is_otg) {
 		intr = hw_read(ci, OP_OTGSC, ~0);
 		hw_write(ci, OP_OTGSC, ~0, intr);
 
@@ -1771,7 +1778,7 @@ static int udc_start(struct ci13xxx *ci)
 		retval = hw_device_reset(ci, USBMODE_CM_DC);
 		if (retval)
 			goto put_transceiver;
-		if(ci->is_otg)
+		if (ci->is_otg)
 			hw_enable_vbus_intr(ci);
 	}
 
@@ -1835,7 +1842,7 @@ static void udc_stop(struct ci13xxx *ci)
 	if (ci == NULL)
 		return;
 
-	if(ci->is_otg)
+	if (ci->is_otg)
 		hw_disable_vbus_intr(ci);
 	cancel_work_sync(&ci->vbus_work);
 
