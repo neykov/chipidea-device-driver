@@ -398,6 +398,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	struct resource	*res;
 	void __iomem	*base;
 	int		ret;
+	bool force_host_mode;
+	bool force_device_mode;
 
 	if (!dev->platform_data) {
 		dev_err(dev, "platform data missing\n");
@@ -459,21 +461,31 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		dev_info(dev, "doesn't support gadget\n");
 
-	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+	force_host_mode = ci->platdata->flags & CI13XXX_FORCE_HOST_MODE;
+	force_device_mode = ci->platdata->flags & CI13XXX_FORCE_DEVICE_MODE;
+	if ((!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) ||
+			(force_host_mode && !ci->roles[CI_ROLE_HOST]) ||
+			(force_device_mode && !ci->roles[CI_ROLE_GADGET])) {
 		dev_err(dev, "no supported roles\n");
 		ret = -ENODEV;
 		goto rm_wq;
 	}
 
-	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+	if (!force_host_mode && !force_device_mode &&
+			ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
 		ci->is_otg = true;
 		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
 		mdelay(2);
 		ci->role = ci_otg_role(ci);
 	} else {
-		ci->role = ci->roles[CI_ROLE_HOST]
-			? CI_ROLE_HOST
-			: CI_ROLE_GADGET;
+		if (force_host_mode)
+			ci->role = CI_ROLE_HOST;
+		else if (force_device_mode)
+			ci->role = CI_ROLE_GADGET;
+		else
+			ci->role = ci->roles[CI_ROLE_HOST]
+				? CI_ROLE_HOST
+				: CI_ROLE_GADGET;
 	}
 
 	ret = ci_role_start(ci, ci->role);
