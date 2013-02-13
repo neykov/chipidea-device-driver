@@ -1395,7 +1395,10 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
 		if (is_active) {
 			pm_runtime_get_sync(&_gadget->dev);
 			hw_device_reset(ci, USBMODE_CM_DC);
-			hw_enable_vbus_intr(ci);
+
+			if (ci->is_otg)
+				hw_enable_vbus_intr(ci);
+
 			hw_device_state(ci, ci->ep0out->qh.dma);
 		} else {
 			hw_device_state(ci, 0);
@@ -1572,7 +1575,8 @@ static int ci13xxx_start(struct usb_gadget *gadget,
 		if (ci->vbus_active) {
 			if (ci->platdata->flags & CI13XXX_REGS_SHARED) {
 				hw_device_reset(ci, USBMODE_CM_DC);
-				hw_enable_vbus_intr(ci);
+				if (ci->is_otg)
+					hw_enable_vbus_intr(ci);
 			}
 		} else {
 			pm_runtime_put_sync(&ci->gadget.dev);
@@ -1680,11 +1684,13 @@ static irqreturn_t udc_irq(struct ci13xxx *ci)
 		retval = IRQ_NONE;
 	}
 
-	intr = hw_read(ci, OP_OTGSC, ~0);
-	hw_write(ci, OP_OTGSC, ~0, intr);
+	if (ci->is_otg) {
+		intr = hw_read(ci, OP_OTGSC, ~0);
+		hw_write(ci, OP_OTGSC, ~0, intr);
 
-	if (intr & (OTGSC_AVVIE & OTGSC_AVVIS))
-		queue_work(ci->wq, &ci->vbus_work);
+		if (intr & (OTGSC_AVVIE & OTGSC_AVVIS))
+			queue_work(ci->wq, &ci->vbus_work);
+	}
 
 	spin_unlock(&ci->lock);
 
@@ -1761,7 +1767,8 @@ static int udc_start(struct ci13xxx *ci)
 		retval = hw_device_reset(ci, USBMODE_CM_DC);
 		if (retval)
 			goto put_transceiver;
-		hw_enable_vbus_intr(ci);
+		if (ci->is_otg)
+			hw_enable_vbus_intr(ci);
 	}
 
 	retval = device_register(&ci->gadget.dev);
@@ -1824,7 +1831,8 @@ static void udc_stop(struct ci13xxx *ci)
 	if (ci == NULL)
 		return;
 
-	hw_disable_vbus_intr(ci);
+	if (ci->is_otg)
+		hw_disable_vbus_intr(ci);
 	cancel_work_sync(&ci->vbus_work);
 
 	usb_del_gadget_udc(&ci->gadget);
