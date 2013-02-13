@@ -178,10 +178,11 @@ static void __init ar913x_usb_setup(void)
 
 static void __init ar933x_usb_setup_ctrl_config(void)
 {
-	void __iomem *usb_ctrl_base;
-	u32 usb_config_reg = usb_ctrl_base + AR71XX_USB_CTRL_REG_CONFIG;
+	void __iomem *usb_ctrl_base, *usb_config_reg;
 	u32 usb_config;
+
 	usb_ctrl_base = ioremap(AR71XX_USB_CTRL_BASE, AR71XX_USB_CTRL_SIZE);
+	usb_config_reg = usb_ctrl_base + AR71XX_USB_CTRL_REG_CONFIG;
 	usb_config = __raw_readl(usb_config_reg);
 	usb_config &= ~AR933X_USB_CONFIG_HOST_ONLY;
 	__raw_writel(usb_config, usb_config_reg);
