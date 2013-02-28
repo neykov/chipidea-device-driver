@@ -398,8 +398,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	struct resource	*res;
 	void __iomem	*base;
 	int		ret;
-	bool force_host_mode;
-	bool force_device_mode;
+	enum usb_dr_mode dr_mode;
 
 	if (!dev->platform_data) {
 		dev_err(dev, "platform data missing\n");
@@ -452,40 +451,38 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	dr_mode = ci->platdata->dr_mode;
+	if (dr_mode == USB_DR_MODE_UNKNOWN)
+		dr_mode = USB_DR_MODE_OTG;
+
 	/* initialize role(s) before the interrupt is requested */
-	ret = ci_hdrc_host_init(ci);
-	if (ret)
-		dev_info(dev, "doesn't support host\n");
+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+		ret = ci_hdrc_host_init(ci);
+		if (ret)
+			dev_info(dev, "doesn't support host\n");
+	}
 
-	ret = ci_hdrc_gadget_init(ci);
-	if (ret)
-		dev_info(dev, "doesn't support gadget\n");
+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
+		ret = ci_hdrc_gadget_init(ci);
+		if (ret)
+			dev_info(dev, "doesn't support gadget\n");
+	}
 
-	force_host_mode = ci->platdata->flags & CI13XXX_FORCE_HOST_MODE;
-	force_device_mode = ci->platdata->flags & CI13XXX_FORCE_DEVICE_MODE;
-	if ((!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) ||
-			(force_host_mode && !ci->roles[CI_ROLE_HOST]) ||
-			(force_device_mode && !ci->roles[CI_ROLE_GADGET])) {
+	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
 		dev_err(dev, "no supported roles\n");
 		ret = -ENODEV;
 		goto rm_wq;
 	}
 
-	if (!force_host_mode && !force_device_mode &&
-			ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
 		ci->is_otg = true;
 		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
 		mdelay(2);
 		ci->role = ci_otg_role(ci);
 	} else {
-		if (force_host_mode)
-			ci->role = CI_ROLE_HOST;
-		else if (force_device_mode)
-			ci->role = CI_ROLE_GADGET;
-		else
-			ci->role = ci->roles[CI_ROLE_HOST]
-				? CI_ROLE_HOST
-				: CI_ROLE_GADGET;
+		ci->role = ci->roles[CI_ROLE_HOST]
+			? CI_ROLE_HOST
+			: CI_ROLE_GADGET;
 	}
 
 	ret = ci_role_start(ci, ci->role);
