@@ -11,8 +11,8 @@
 
 #include <linux/usb/otg.h>
 
-struct ar933x_usb_platform_data {
-	usb_dr_mode dr_mode;
+struct ar933x_chipidea_platform_data {
+	enum usb_dr_mode dr_mode;
 };
 
 #endif /* _AR933X_UART_PLATFORM_H */

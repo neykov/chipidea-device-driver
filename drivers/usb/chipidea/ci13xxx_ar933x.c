@@ -13,6 +13,7 @@
 #include <linux/usb/chipidea.h>
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
+#include <asm/mach-ath79/ar933x_chipidea_platform.h>
 
 #include "ci.h"
 
@@ -25,7 +26,7 @@ static int ci13xxx_ar933x_probe(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "ci13xxx_ar933x_probe\n");
 
-	ar933x_chipidea_data = pdef->platform_data;
+	ar933x_chipidea_data = pdev->dev.platform_data;
 
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
@@ -35,7 +36,7 @@ static int ci13xxx_ar933x_probe(struct platform_device *pdev)
 
 	pdata->name = "ci13xxx_ar933x";
 	pdata->capoffset = DEF_CAPOFFSET;
-	pdata->dr_mode = ar933x_chipidea_data.dr_mode;
+	pdata->dr_mode = ar933x_chipidea_data->dr_mode;
 	plat_ci = ci13xxx_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
 				pdata);
@@ -64,7 +65,7 @@ static int ci13xxx_ar933x_remove(struct platform_device *pdev)
 
 static struct platform_driver ci13xxx_ar933x_driver = {
 	.probe = ci13xxx_ar933x_probe,
-	.remove = __ci13xxx_ar933x_remove,
+	.remove = ci13xxx_ar933x_remove,
 	.driver = { .name = "ar933x-chipidea", },
 };
 
