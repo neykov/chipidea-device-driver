@@ -22,6 +22,7 @@
 
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
+#include <asm/mach-ath79/ar933x_chipidea_platform.h>
 #include "common.h"
 #include "dev-usb.h"
 
@@ -59,6 +60,20 @@ static struct usb_ehci_pdata ath79_ehci_pdata_v2 = {
 
 static struct platform_device ath79_ehci_device = {
 	.name		= "ehci-platform",
+	.id		= -1,
+	.resource	= ath79_ehci_resources,
+	.num_resources	= ARRAY_SIZE(ath79_ehci_resources),
+	.dev = {
+		.dma_mask		= &ath79_ehci_dmamask,
+		.coherent_dma_mask	= DMA_BIT_MASK(32),
+	},
+};
+
+static struct ar933x_chipidea_platform_data ar933x_chipidea_data = {
+};
+
+static struct platform_device ar933x_chipidea_device = {
+	.name		= "ar933x-chipidea",
 	.id		= -1,
 	.resource	= ath79_ehci_resources,
 	.num_resources	= ARRAY_SIZE(ath79_ehci_resources),
@@ -190,9 +205,13 @@ static void __init ar933x_usb_setup_ctrl_config(void)
 static void __init ar933x_usb_setup(void)
 {
 	u32 bootstrap;
+	enum dr_mode dr_mode;
 
 	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
-	if (!(bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST)) {
+	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST) {
+		dr_mode = USB_DR_MODE_HOST;
+	} else {
+		dr_mode = USB_DR_MODE_PERIPHERIAL;
 		ar933x_usb_setup_ctrl_config();
 	}
 
@@ -207,8 +226,13 @@ static void __init ar933x_usb_setup(void)
 
 	ath79_usb_init_resource(ath79_ehci_resources, AR933X_EHCI_BASE,
 				AR933X_EHCI_SIZE, ATH79_CPU_IRQ_USB);
+
 	ath79_ehci_device.dev.platform_data = &ath79_ehci_pdata_v2;
 	platform_device_register(&ath79_ehci_device);
+
+	ar933x_chipidea_data.dr_mode = dr_mode;
+	ar933x_chipidea_device.dev.platform_data = &ar933x_chipidea_data;
+	platform_device_register(&ar933x_chipidea_device);
 }
 
 static void __init ar934x_usb_setup(void)

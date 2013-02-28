@@ -10,7 +10,6 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
 # Glue/Bridge layers go here
 
 obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
-obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_ar933x.o
 
 # PCI doesn't provide stubs, need to check
 ifneq ($(CONFIG_PCI),)
@@ -20,3 +19,8 @@ endif
 ifneq ($(CONFIG_OF_DEVICE),)
 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o usbmisc_imx6q.o
 endif
+
+ifneq ($(CONFIG_SOC_AR933X),)
+	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_ar933x.o
+endif
+

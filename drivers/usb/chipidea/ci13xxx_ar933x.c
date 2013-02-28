@@ -16,28 +16,29 @@
 
 #include "ci.h"
 
-static struct ci13xxx_platform_data ci13xxx_ar933x_platdata = {
-	.name			= "ci13xxx_ar933x",
-	.flags			= 0,
-	.capoffset		= DEF_CAPOFFSET
-};
-
-static int __devinit ci13xxx_ar933x_probe(struct platform_device *pdev)
+static int ci13xxx_ar933x_probe(struct platform_device *pdev)
 {
 	u32 bootstrap;
+	struct ar933x_chipidea_platform_data *ar933x_chipidea_data;
+	struct ci13xxx_platform_data *pdata;
 	struct platform_device *plat_ci;
 
 	dev_dbg(&pdev->dev, "ci13xxx_ar933x_probe\n");
 
-	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
-	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST)
-		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_HOST_MODE;
-	else
-		ci13xxx_ar933x_platdata.flags = CI13XXX_FORCE_DEVICE_MODE;
+	ar933x_chipidea_data = pdef->platform_data;
 
+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		dev_err(&pdev->dev, "Failed to allocate ci13xxx-ar933x pdata!\n");
+		return -ENOMEM;
+	}
+
+	pdata->name = "ci13xxx_ar933x";
+	pdata->capoffset = DEF_CAPOFFSET;
+	pdata->dr_mode = ar933x_chipidea_data.dr_mode;
 	plat_ci = ci13xxx_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
-				&ci13xxx_ar933x_platdata);
+				pdata);
 	if (IS_ERR(plat_ci)) {
 		dev_err(&pdev->dev, "ci13xxx_add_device failed!\n");
 		return PTR_ERR(plat_ci);
@@ -51,7 +52,7 @@ static int __devinit ci13xxx_ar933x_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit ci13xxx_ar933x_remove(struct platform_device *pdev)
+static int ci13xxx_ar933x_remove(struct platform_device *pdev)
 {
 	struct platform_device *plat_ci = platform_get_drvdata(pdev);
 
@@ -63,11 +64,11 @@ static int __devexit ci13xxx_ar933x_remove(struct platform_device *pdev)
 
 static struct platform_driver ci13xxx_ar933x_driver = {
 	.probe = ci13xxx_ar933x_probe,
-	.remove = __devexit_p(ci13xxx_ar933x_remove),
-	.driver = { .name = "ehci-platform", },
+	.remove = __ci13xxx_ar933x_remove,
+	.driver = { .name = "ar933x-chipidea", },
 };
 
 module_platform_driver(ci13xxx_ar933x_driver);
 
-MODULE_ALIAS("platform:ar933x_hsusb");
+MODULE_ALIAS("platform:ci13xxx_ar933x_driver");
 MODULE_LICENSE("GPL v2");
