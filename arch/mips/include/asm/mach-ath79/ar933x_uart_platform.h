@@ -11,8 +11,6 @@
 #ifndef _AR933X_UART_PLATFORM_H
 #define _AR933X_UART_PLATFORM_H
 
-#include <linux/usb/otg.h>
-
 struct ar933x_uart_platform_data {
 	unsigned	uartclk;
 };
