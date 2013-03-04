@@ -41,6 +41,15 @@ static unsigned int		payload_misses;
 /* amount of memory (in bytes) currently consumed by the DRC */
 static unsigned int		drc_mem_usage;
 
+/* total time spent searching the cache */
+static s64			time_in_search;
+
+/* total number of times we searched the cache */
+static u64			num_searches;
+
+/* longest time we spent doing a single search */
+static s64			max_search_time;
+
 /*
  * Calculate the hash index from an XID.
  */
@@ -318,15 +327,25 @@ nfsd_cache_match(struct svc_rqst *rqstp, __wsum csum, struct svc_cacherep *rp)
 static struct svc_cacherep *
 nfsd_cache_search(struct svc_rqst *rqstp, __wsum csum)
 {
-	struct svc_cacherep	*rp;
+	struct svc_cacherep	*rp, *ret = NULL;
 	struct hlist_head 	*rh;
+	ktime_t			start;
+	s64			delta;
 
+	start = ktime_get();
 	rh = &cache_hash[request_hash(rqstp->rq_xid)];
 	hlist_for_each_entry(rp, rh, c_hash) {
-		if (nfsd_cache_match(rqstp, csum, rp))
-			return rp;
+		if (nfsd_cache_match(rqstp, csum, rp)) {
+			ret = rp;
+			break;
+		}
 	}
-	return NULL;
+	delta = ktime_to_ns(ktime_sub(ktime_get(), start));
+	time_in_search += delta;
+	max_search_time = max(max_search_time, delta);
+	++num_searches;
+
+	return ret;
 }
 
 /*
@@ -558,6 +577,14 @@ nfsd_cache_append(struct svc_rqst *rqstp, struct kvec *data)
 	return 1;
 }
 
+static s64
+avg_search_time(void)
+{
+	if (!num_searches)
+		return 0;
+	return time_in_search / num_searches;
+}
+
 /*
  * Note that fields may be added, removed or reordered in the future. Programs
  * scraping this file for info should test the labels to ensure they're
@@ -574,6 +601,8 @@ static int nfsd_reply_cache_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "cache misses:          %u\n", nfsdstats.rcmisses);
 	seq_printf(m, "not cached:            %u\n", nfsdstats.rcnocache);
 	seq_printf(m, "payload misses:        %u\n", payload_misses);
+	seq_printf(m, "avg search time:       %lldns\n", avg_search_time());
+	seq_printf(m, "max search time:       %lldns\n", max_search_time);
 	spin_unlock(&cache_lock);
 	return 0;
 }
