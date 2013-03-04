@@ -50,6 +50,12 @@ static u64			num_searches;
 /* longest time we spent doing a single search */
 static s64			max_search_time;
 
+/* longest hash chain seen */
+static unsigned int		longest_chain;
+
+/* size of cache when we saw the longest hash chain */
+static unsigned int		longest_chain_cachesize;
+
 /*
  * Calculate the hash index from an XID.
  */
@@ -330,11 +336,13 @@ nfsd_cache_search(struct svc_rqst *rqstp, __wsum csum)
 	struct svc_cacherep	*rp, *ret = NULL;
 	struct hlist_head 	*rh;
 	ktime_t			start;
+	unsigned int		entries = 0;
 	s64			delta;
 
 	start = ktime_get();
 	rh = &cache_hash[request_hash(rqstp->rq_xid)];
 	hlist_for_each_entry(rp, rh, c_hash) {
+		++entries;
 		if (nfsd_cache_match(rqstp, csum, rp)) {
 			ret = rp;
 			break;
@@ -343,6 +351,17 @@ nfsd_cache_search(struct svc_rqst *rqstp, __wsum csum)
 	delta = ktime_to_ns(ktime_sub(ktime_get(), start));
 	time_in_search += delta;
 	max_search_time = max(max_search_time, delta);
+
+	/* tally hash chain length stats */
+	if (entries >= longest_chain) {
+		longest_chain = entries;
+		if (!longest_chain_cachesize)
+			longest_chain_cachesize = num_drc_entries;
+		else
+			longest_chain_cachesize = min(longest_chain_cachesize,
+							num_drc_entries);
+	}
+
 	++num_searches;
 
 	return ret;
@@ -603,6 +622,8 @@ static int nfsd_reply_cache_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "payload misses:        %u\n", payload_misses);
 	seq_printf(m, "avg search time:       %lldns\n", avg_search_time());
 	seq_printf(m, "max search time:       %lldns\n", max_search_time);
+	seq_printf(m, "longest chain len:     %u\n", longest_chain);
+	seq_printf(m, "cachesize at longest:  %u\n", longest_chain_cachesize);
 	spin_unlock(&cache_lock);
 	return 0;
 }
