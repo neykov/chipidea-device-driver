@@ -288,6 +288,7 @@ static int __init eisa_request_resources(struct eisa_root_device *root,
 			edev->res[i].flags = IORESOURCE_IO | IORESOURCE_BUSY;
 		}
 
+		dev_printk(KERN_DEBUG, &edev->dev, "%pR\n", &edev->res[i]);
 		if (request_resource(root->res, &edev->res[i]))
 			goto failed;
 	}
@@ -327,20 +328,19 @@ static int __init eisa_probe(struct eisa_root_device *root)
 		return -ENOMEM;
 	}
 		
+	if (eisa_init_device(root, edev, 0)) {
+		kfree(edev);
+		if (!root->force_probe)
+			return -ENODEV;
+		goto force_probe;
+	}
+
 	if (eisa_request_resources(root, edev, 0)) {
 		dev_warn(root->dev,
 		         "EISA: Cannot allocate resource for mainboard\n");
 		kfree(edev);
 		if (!root->force_probe)
 			return -EBUSY;
-		goto force_probe;
-	}
-
-	if (eisa_init_device(root, edev, 0)) {
-		eisa_release_resources(edev);
-		kfree(edev);
-		if (!root->force_probe)
-			return -ENODEV;
 		goto force_probe;
 	}
 
