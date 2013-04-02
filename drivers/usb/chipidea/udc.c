@@ -1831,7 +1831,8 @@ static void udc_stop(struct ci13xxx *ci)
 		return;
 
 	hw_disable_vbus_intr(ci);
-	cancel_work_sync(&ci->vbus_work);
+	if (ci->is_otg)
+		cancel_work_sync(&ci->vbus_work);
 
 	usb_del_gadget_udc(&ci->gadget);
 
@@ -1873,7 +1874,8 @@ int ci_hdrc_gadget_init(struct ci13xxx *ci)
 	rdrv->irq	= udc_irq;
 	rdrv->name	= "gadget";
 	ci->roles[CI_ROLE_GADGET] = rdrv;
-	INIT_WORK(&ci->vbus_work, vbus_work);
+	if (ci->is_otg)
+		INIT_WORK(&ci->vbus_work, vbus_work);
 
 	return 0;
 }
