@@ -20,14 +20,17 @@
 #include <linux/usb/ehci_pdriver.h>
 #include <linux/usb/ohci_pdriver.h>
 #include <linux/usb/otg.h>
+#include <linux/slab.h>
+#include <linux/usb/chipidea.h>
 
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
-#include <asm/mach-ath79/ar933x_chipidea_platform.h>
 #include "common.h"
 #include "dev-usb.h"
 
-static struct resource ath79_ohci_resources[2];
+#define ATH79_NUM_RESOURCES 2
+
+static struct resource ath79_ohci_resources[ATH79_NUM_RESOURCES];
 
 static u64 ath79_ohci_dmamask = DMA_BIT_MASK(32);
 
@@ -46,7 +49,7 @@ static struct platform_device ath79_ohci_device = {
 	},
 };
 
-static struct resource ath79_ehci_resources[2];
+static struct resource ath79_ehci_resources[ATH79_NUM_RESOURCES];
 
 static u64 ath79_ehci_dmamask = DMA_BIT_MASK(32);
 
@@ -70,23 +73,7 @@ static struct platform_device ath79_ehci_device = {
 	},
 };
 
-static struct resource ar933x_chipidea_resources[2];
-
-static struct ar933x_chipidea_platform_data ar933x_chipidea_data = {
-};
-
-static struct platform_device ar933x_chipidea_device = {
-	.name		= "ar933x-chipidea",
-	.id		= -1,
-	.resource	= ar933x_chipidea_resources,
-	.num_resources	= ARRAY_SIZE(ar933x_chipidea_resources),
-	.dev = {
-		.dma_mask		= &ath79_ehci_dmamask,
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-};
-
-static void __init ath79_usb_init_resource(struct resource res[2],
+static void __init ath79_usb_init_resource(struct resource res[ATH79_NUM_RESOURCES],
 					   unsigned long base,
 					   unsigned long size,
 					   int irq)
@@ -205,10 +192,14 @@ static void __init ar933x_usb_setup_ctrl_config(void)
 	iounmap(usb_ctrl_base);
 }
 
-static void __init ar933x_usb_setup(void)
+static void __init ar933x_ci_usb_setup(void)
 {
 	u32 bootstrap;
 	enum usb_dr_mode dr_mode;
+	struct resource *ci_resources;
+	u32 ci_resources_size = ATH79_NUM_RESOURCES * sizeof(*ci_resources);
+	struct ci13xxx_platform_data *ci_pdata;
+	struct platform_device *ci_pdevice;
 
 	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
 	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST) {
@@ -218,6 +209,47 @@ static void __init ar933x_usb_setup(void)
 		ar933x_usb_setup_ctrl_config();
 	}
 
+	ci_resources = kzalloc(ci_resources_size, GFP_KERNEL);
+	if (!ci_resources) {
+		return;
+
+	}
+	ath79_usb_init_resource(ci_resources, AR933X_EHCI_BASE,
+				AR933X_EHCI_SIZE, ATH79_CPU_IRQ_USB);
+
+	ci_pdata = kzalloc(sizeof(*ci_pdata), GFP_KERNEL);
+	if (!ci_pdata) {
+		goto err_pdata;
+
+	}
+	ci_pdata->name = "ci13xxx_ar933x";
+	ci_pdata->capoffset = DEF_CAPOFFSET;
+	ci_pdata->dr_mode = dr_mode;
+
+	ci_pdevice = kzalloc(sizeof(*ci_pdevice), GFP_KERNEL);
+	if (!ci_pdevice) {
+		goto err_ci_pdevice;
+	}
+	ci_pdevice->name = "ci_hdrc";
+	ci_pdevice->id = -1;
+	ci_pdevice->resource = ci_resources;
+	ci_pdevice->num_resources = ATH79_NUM_RESOURCES;
+	ci_pdevice->dev.dma_mask = &ath79_ehci_dmamask;
+	ci_pdevice->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	ci_pdevice->dev.platform_data = ci_pdata;
+
+	platform_device_register(ci_pdevice);
+
+	return;
+
+err_ci_pdevice:
+	kfree(ci_pdata);
+err_pdata:
+	kfree(ci_resources);
+}
+
+static void __init ar933x_usb_setup(void)
+{
 	ath79_device_reset_set(AR933X_RESET_USBSUS_OVERRIDE);
 	mdelay(10);
 
@@ -229,16 +261,10 @@ static void __init ar933x_usb_setup(void)
 
 	ath79_usb_init_resource(ath79_ehci_resources, AR933X_EHCI_BASE,
 				AR933X_EHCI_SIZE, ATH79_CPU_IRQ_USB);
-
 	ath79_ehci_device.dev.platform_data = &ath79_ehci_pdata_v2;
 	platform_device_register(&ath79_ehci_device);
 
-	ath79_usb_init_resource(ar933x_chipidea_resources, AR933X_EHCI_BASE,
-				AR933X_EHCI_SIZE, ATH79_CPU_IRQ_USB);
-
-	ar933x_chipidea_data.dr_mode = dr_mode;
-	ar933x_chipidea_device.dev.platform_data = &ar933x_chipidea_data;
-	platform_device_register(&ar933x_chipidea_device);
+	ar933x_ci_usb_setup();
 }
 
 static void __init ar934x_usb_setup(void)
