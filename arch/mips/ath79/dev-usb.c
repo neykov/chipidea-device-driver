@@ -19,6 +19,8 @@
 #include <linux/platform_device.h>
 #include <linux/usb/ehci_pdriver.h>
 #include <linux/usb/ohci_pdriver.h>
+#include <linux/usb/otg.h>
+#include <linux/usb/chipidea.h>
 
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
@@ -165,6 +167,44 @@ static void __init ar913x_usb_setup(void)
 			   &ath79_ehci_pdata_v2, sizeof(ath79_ehci_pdata_v2));
 }
 
+static void __init ar933x_usb_setup_ctrl_config(void)
+{
+	void __iomem *usb_ctrl_base, *usb_config_reg;
+	u32 usb_config;
+
+	usb_ctrl_base = ioremap(AR71XX_USB_CTRL_BASE, AR71XX_USB_CTRL_SIZE);
+	usb_config_reg = usb_ctrl_base + AR71XX_USB_CTRL_REG_CONFIG;
+	usb_config = __raw_readl(usb_config_reg);
+	usb_config &= ~AR933X_USB_CONFIG_HOST_ONLY;
+	__raw_writel(usb_config, usb_config_reg);
+	iounmap(usb_ctrl_base);
+}
+
+static void __init ar933x_ci_usb_setup(void)
+{
+	u32 bootstrap;
+	enum usb_dr_mode dr_mode;
+	struct ci13xxx_platform_data ci_pdata;
+
+	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
+	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST) {
+		dr_mode = USB_DR_MODE_HOST;
+	} else {
+		dr_mode = USB_DR_MODE_PERIPHERAL;
+		ar933x_usb_setup_ctrl_config();
+	}
+
+	memset(&ci_pdata, 0, sizeof(ci_pdata));
+	ci_pdata.name = "ci13xxx_ar933x";
+	ci_pdata.capoffset = DEF_CAPOFFSET;
+	ci_pdata.dr_mode = dr_mode;
+
+	ath79_usb_register("ci_hdrc", -1,
+			   AR933X_EHCI_BASE, AR933X_EHCI_SIZE,
+			   ATH79_CPU_IRQ(3),
+			   &ci_pdata, sizeof(ci_pdata));
+}
+
 static void __init ar933x_usb_setup(void)
 {
 	ath79_device_reset_set(AR933X_RESET_USBSUS_OVERRIDE);
@@ -180,6 +220,8 @@ static void __init ar933x_usb_setup(void)
 			   AR933X_EHCI_BASE, AR933X_EHCI_SIZE,
 			   ATH79_CPU_IRQ(3),
 			   &ath79_ehci_pdata_v2, sizeof(ath79_ehci_pdata_v2));
+
+	ar933x_ci_usb_setup();
 }
 
 static void __init ar934x_usb_setup(void)
