@@ -194,9 +194,11 @@ struct nfsd4_conn {
 };
 
 struct nfsd4_session {
-	struct kref		se_ref;
+	atomic_t		se_ref;
 	struct list_head	se_hash;	/* hash by sessionid */
 	struct list_head	se_perclnt;
+/* See SESSION4_PERSIST, etc. for standard flags; this is internal-only: */
+#define NFS4_SESSION_DEAD	0x010
 	u32			se_flags;
 	struct nfs4_client	*se_client;
 	struct nfs4_sessionid	se_sessionid;
@@ -285,18 +287,6 @@ struct nfs4_client {
 						/* wait here for slots */
 	struct net		*net;
 };
-
-static inline void
-mark_client_expired(struct nfs4_client *clp)
-{
-	clp->cl_time = 0;
-}
-
-static inline bool
-is_client_expired(struct nfs4_client *clp)
-{
-	return clp->cl_time == 0;
-}
 
 /* struct nfs4_client_reset
  * one per old client. Populates reset_str_hashtbl. Filled from conf_id_hashtbl
@@ -486,7 +476,7 @@ extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern struct nfs4_client_reclaim *nfs4_client_to_reclaim(const char *name,
 							struct nfsd_net *nn);
 extern bool nfs4_has_reclaimed_state(const char *name, struct nfsd_net *nn);
-extern void release_session_client(struct nfsd4_session *);
+extern void put_client_renew(struct nfs4_client *clp);
 extern void nfsd4_purge_closed_stateid(struct nfs4_stateowner *);
 
 /* nfs4recover operations */
