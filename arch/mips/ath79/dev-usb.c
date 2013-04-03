@@ -20,7 +20,6 @@
 #include <linux/usb/ehci_pdriver.h>
 #include <linux/usb/ohci_pdriver.h>
 #include <linux/usb/otg.h>
-#include <linux/slab.h>
 #include <linux/usb/chipidea.h>
 
 #include <asm/mach-ath79/ath79.h>
@@ -28,9 +27,7 @@
 #include "common.h"
 #include "dev-usb.h"
 
-#define ATH79_NUM_RESOURCES 2
-
-static struct resource ath79_ohci_resources[ATH79_NUM_RESOURCES];
+static struct resource ath79_ohci_resources[2];
 
 static u64 ath79_ohci_dmamask = DMA_BIT_MASK(32);
 
@@ -49,7 +46,7 @@ static struct platform_device ath79_ohci_device = {
 	},
 };
 
-static struct resource ath79_ehci_resources[ATH79_NUM_RESOURCES];
+static struct resource ath79_ehci_resources[2];
 
 static u64 ath79_ehci_dmamask = DMA_BIT_MASK(32);
 
@@ -73,7 +70,39 @@ static struct platform_device ath79_ehci_device = {
 	},
 };
 
-static void __init ath79_usb_init_resource(struct resource res[ATH79_NUM_RESOURCES],
+static void __init ath79_usb_register(const char *name, int id,
+				      unsigned long base, unsigned long size,
+				      int irq, const void *data,
+				      size_t data_size)
+{
+	struct resource res[2];
+	struct platform_device *pdev;
+
+	memset(res, 0, sizeof(res));
+
+	res[0].flags = IORESOURCE_MEM;
+	res[0].start = base;
+	res[0].end = base + size - 1;
+
+	res[1].flags = IORESOURCE_IRQ;
+	res[1].start = irq;
+	res[1].end = irq;
+
+	pdev = platform_device_register_resndata(NULL, name, id,
+						 res, ARRAY_SIZE(res),
+						 data, data_size);
+
+	if (IS_ERR(pdev)) {
+		pr_err("ath79: unable to register USB at %08lx, err=%d\n",
+		       base, (int) PTR_ERR(pdev));
+		return;
+	}
+
+	pdev->dev.dma_mask = &ath79_usb_dmamask;
+	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+}
+
+static void __init ath79_usb_init_resource(struct resource res[2],
 					   unsigned long base,
 					   unsigned long size,
 					   int irq)
@@ -196,10 +225,7 @@ static void __init ar933x_ci_usb_setup(void)
 {
 	u32 bootstrap;
 	enum usb_dr_mode dr_mode;
-	struct resource *ci_resources;
-	u32 ci_resources_size = ATH79_NUM_RESOURCES * sizeof(*ci_resources);
-	struct ci13xxx_platform_data *ci_pdata;
-	struct platform_device *ci_pdevice;
+	struct ci13xxx_platform_data ci_pdata;
 
 	bootstrap = ath79_reset_rr(AR933X_RESET_REG_BOOTSTRAP);
 	if (bootstrap & AR933X_BOOTSTRAP_USB_MODE_HOST) {
@@ -209,43 +235,14 @@ static void __init ar933x_ci_usb_setup(void)
 		ar933x_usb_setup_ctrl_config();
 	}
 
-	ci_resources = kzalloc(ci_resources_size, GFP_KERNEL);
-	if (!ci_resources) {
-		return;
+	ci_pdata.name = "ci13xxx_ar933x";
+	ci_pdata.capoffset = DEF_CAPOFFSET;
+	ci_pdata.dr_mode = dr_mode;
 
-	}
-	ath79_usb_init_resource(ci_resources, AR933X_EHCI_BASE,
-				AR933X_EHCI_SIZE, ATH79_CPU_IRQ_USB);
-
-	ci_pdata = kzalloc(sizeof(*ci_pdata), GFP_KERNEL);
-	if (!ci_pdata) {
-		goto err_pdata;
-
-	}
-	ci_pdata->name = "ci13xxx_ar933x";
-	ci_pdata->capoffset = DEF_CAPOFFSET;
-	ci_pdata->dr_mode = dr_mode;
-
-	ci_pdevice = kzalloc(sizeof(*ci_pdevice), GFP_KERNEL);
-	if (!ci_pdevice) {
-		goto err_ci_pdevice;
-	}
-	ci_pdevice->name = "ci_hdrc";
-	ci_pdevice->id = -1;
-	ci_pdevice->resource = ci_resources;
-	ci_pdevice->num_resources = ATH79_NUM_RESOURCES;
-	ci_pdevice->dev.dma_mask = &ath79_ehci_dmamask;
-	ci_pdevice->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-	ci_pdevice->dev.platform_data = ci_pdata;
-
-	platform_device_register(ci_pdevice);
-
-	return;
-
-err_ci_pdevice:
-	kfree(ci_pdata);
-err_pdata:
-	kfree(ci_resources);
+	ath79_usb_register("ci_hdrc", -1,
+			   AR933X_EHCI_BASE, AR933X_EHCI_SIZE,
+			   ATH79_CPU_IRQ(3),
+			   &ci_pdata, sizeof(ci_pdata));
 }
 
 static void __init ar933x_usb_setup(void)
